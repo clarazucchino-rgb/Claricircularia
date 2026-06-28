@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Chart, type ChartData, type ChartOptions, ChartType, Plugin } from "chart.js/auto";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Chart, type ChartData, Plugin } from "chart.js/auto";
 
 const STAGES = [
   {
@@ -340,7 +340,9 @@ const STAGES = [
   },
 ];
 
-const initialAnswers: Record<string, any> = {};
+type AnswersState = Record<string, Record<string, Record<number, Record<number, boolean>>>>;
+
+const initialAnswers: AnswersState = {};
 STAGES.forEach((stage) => {
   initialAnswers[stage.id] = {};
   stage.sections.forEach((section) => {
@@ -351,7 +353,7 @@ STAGES.forEach((stage) => {
   });
 });
 
-const initialPreloaded = {
+const initialPreloaded: AnswersState = {
   diseno: { A: { 0: { 0: true }, 1: { 0: true }, 2: { 0: true } }, B: { 0: { 1: true }, 1: { 2: true }, 2: { 2: true } }, C: { 0: { 1: true } } },
   produccion: { A: { 0: { 2: true }, 1: { 3: true } }, B: { 0: { 0: true }, 1: { 0: true }, 2: { 14: true } }, C: { 0: { 0: true } } },
   consumo: { A: { 0: { 1: true }, 1: { 0: true } }, B: { 0: { 0: true } }, C: { 0: { 0: true, 1: true, 2: true } } },
@@ -370,9 +372,6 @@ const defaultFichaState = {
 
 const BASE = 5;
 const RANGE = 8;
-
-const likertLabels = ["No sostenible", "Impacto alto", "Neutro", "Sostenible", "Muy sostenible"];
-const likertColors = ["#e8734a", "#f0a060", "#d4cfc6", "#a8e63d", "#7ec832"];
 
 const glosario = [
   {
@@ -402,45 +401,10 @@ function normalize(v: number) {
   return Math.max(0.2, Math.min(BASE * 2, BASE - (v / RANGE) * BASE));
 }
 
-function getStageScores(stageId: string) {
-  const stage = STAGES.find((stage) => stage.id === stageId)!;
-  return stage.sections.reduce(
-    (acc, section) => {
-      section.subsections.forEach((sub, subIndex) => {
-        sub.opts.forEach((opt, optIndex) => {
-          if (acc.answers[stageId][section.id][subIndex]?.[optIndex]) {
-            acc.soc += opt.soc;
-            acc.eco += opt.eco;
-            acc.env += opt.env;
-          }
-        });
-      });
-      return acc;
-    },
-    { soc: 0, eco: 0, env: 0, answers: null as any }
-  );
-}
-
-function scoreColor(v: number) {
-  return v > 0 ? "#a8e63d" : v < 0 ? "#e8734a" : "#d4cfc6";
-}
-
-function verdict(v: number) {
-  return v >= 3 ? "Impacto positivo" : v >= -2 ? "Impacto neutro" : "Requiere atención";
-}
-
-function likertPos(total: number) {
-  if (total <= -6) return 0;
-  if (total <= -2) return 1;
-  if (total <= 2) return 2;
-  if (total <= 6) return 3;
-  return 4;
-}
-
 export default function CirculariaApp() {
   const [page, setPage] = useState("home");
   const [ficha, setFicha] = useState(defaultFichaState);
-  const [answers, setAnswers] = useState(() => ({ ...initialAnswers, ...initialPreloaded }));
+  const [answers, setAnswers] = useState<AnswersState>(() => ({ ...initialAnswers, ...initialPreloaded }));
   const [curStage, setCurStage] = useState(0);
   const [showFicha, setShowFicha] = useState(true);
   const [zoomStage, setZoomStage] = useState<string | null>(null);
@@ -461,36 +425,7 @@ export default function CirculariaApp() {
     return matchCat && matchText;
   });
 
-  const totalScores = () => {
-    return STAGES.reduce(
-      (acc, stage) => {
-        const s = stage.sections.reduce(
-          (stageAcc, section) => {
-            section.subsections.forEach((sub, subIndex) => {
-              sub.opts.forEach((opt, optIndex) => {
-                if (answers[stage.id][section.id][subIndex]?.[optIndex]) {
-                  stageAcc.soc += opt.soc;
-                  stageAcc.eco += opt.eco;
-                  stageAcc.env += opt.env;
-                }
-              });
-            });
-            return stageAcc;
-          },
-          { soc: 0, eco: 0, env: 0 }
-        );
-        acc.soc += s.soc;
-        acc.eco += s.eco;
-        acc.env += s.env;
-        return acc;
-      },
-      { soc: 0, eco: 0, env: 0 }
-    );
-  };
-
-  const totals = totalScores();
-
-  const stageSummary = STAGES.map((stage) => {
+  const stageSummary = useMemo(() => STAGES.map((stage) => {
     const stageScore = stage.sections.reduce(
       (acc, section) => {
         section.subsections.forEach((sub, subIndex) => {
@@ -507,7 +442,7 @@ export default function CirculariaApp() {
       { soc: 0, eco: 0, env: 0 }
     );
     return { ...stageScore, total: stageScore.soc + stageScore.eco + stageScore.env, lbl: stage.lbl, color: stage.color, num: stage.num };
-  });
+  }), [answers]);
 
   useEffect(() => {
     if (!radarRef.current) return;
@@ -515,7 +450,9 @@ export default function CirculariaApp() {
     const plugin: Plugin = {
       id: "tri",
       beforeDraw(chart) {
-        const rScale = (chart as any).scales.r;
+        const rScale = chart.scales.r as unknown as
+          | { xCenter: number; yCenter: number; drawingArea: number }
+          | undefined;
         if (!rScale) return;
         const ctx = chart.ctx;
         const { xCenter: cx, yCenter: cy, drawingArea: R } = rScale;
@@ -583,7 +520,7 @@ export default function CirculariaApp() {
             grid: { color: "rgba(0,0,0,0)" },
             angleLines: { color: "rgba(20,18,14,.18)", lineWidth: 0.6 },
             pointLabels: {
-              font: { size: 10, family: "Bai Jamjuree", weight: "500" },
+              font: { size: 10, family: "Bai Jamjuree", weight: 500 },
               color: "#1a1f2e",
               padding: 10,
             },
@@ -596,19 +533,9 @@ export default function CirculariaApp() {
     rChartRef.current = chart;
 
     return () => chart.destroy();
-  }, []);
+  }, [stageSummary]);
 
-  useEffect(() => {
-    if (!rChartRef.current) return;
-    rChartRef.current.data.datasets![0].data = stageSummary.map((stage) => normalize(stage.env));
-    rChartRef.current.data.datasets![1].data = stageSummary.map((stage) => normalize(stage.eco));
-    rChartRef.current.data.datasets![2].data = stageSummary.map((stage) => normalize(stage.soc));
-    rChartRef.current.update();
-
-    if (zoomStage) renderZoom(zoomStage);
-  }, [answers, zoomStage]);
-
-  const renderZoom = (stageId: string) => {
+  const renderZoom = useCallback((stageId: string) => {
     if (!zoomRef.current) return;
     const stage = STAGES.find((stage) => stage.id === stageId)!;
 
@@ -680,14 +607,24 @@ export default function CirculariaApp() {
         },
       },
     });
-  };
+  }, [answers]);
+
+  useEffect(() => {
+    if (!rChartRef.current) return;
+    rChartRef.current.data.datasets![0].data = stageSummary.map((stage) => normalize(stage.env));
+    rChartRef.current.data.datasets![1].data = stageSummary.map((stage) => normalize(stage.eco));
+    rChartRef.current.data.datasets![2].data = stageSummary.map((stage) => normalize(stage.soc));
+    rChartRef.current.update();
+
+    if (zoomStage) renderZoom(zoomStage);
+  }, [renderZoom, stageSummary, zoomStage]);
 
   const handleToggleOption = (stageId: string, sectionId: string, subIndex: number, optIndex: number, isRadio: boolean) => {
     setAnswers((current) => {
-      const next = JSON.parse(JSON.stringify(current));
+      const next = structuredClone(current);
       if (isRadio) {
         Object.keys(next[stageId][sectionId][subIndex]).forEach((key) => {
-          next[stageId][sectionId][subIndex][key] = false;
+          next[stageId][sectionId][subIndex][Number(key)] = false;
         });
       }
       next[stageId][sectionId][subIndex][optIndex] = !next[stageId][sectionId][subIndex][optIndex];
