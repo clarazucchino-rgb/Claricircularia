@@ -632,6 +632,11 @@ export default function CirculariaApp() {
     });
   };
 
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    window.location.href = "/login";
+  };
+
   const renderStageTabs = () => {
     return (
       <>
@@ -713,6 +718,7 @@ export default function CirculariaApp() {
           <button className={`nav-btn ${page === "port" ? "active" : ""}`} onClick={() => setPage("port")}>Portafolio</button>
           <button className={`nav-btn ${page === "glos" ? "active" : ""}`} onClick={() => setPage("glos")}>Glosario</button>
           <div className="nav-badge">prototipo</div>
+          <button className="nav-btn" onClick={handleLogout}>Salir</button>
         </div>
       </nav>
 
