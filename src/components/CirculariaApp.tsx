@@ -810,14 +810,18 @@ export default function CirculariaApp() {
   return (
     <div className="page-shell">
       <nav className="nav">
-        <div className="logo" onClick={() => setPage("home")}><span style={{ cursor: "pointer" }}>circularia</span><em>.</em></div>
+        <div className="nav-handle" aria-hidden="true">menu</div>
+        <div className="logo" onClick={() => setPage("home")}>
+          <span className="logo-mark">c.</span>
+          <span className="logo-word">circularia</span><em>.</em>
+        </div>
         <div className="nav-links">
-          <button className={`nav-btn ${page === "home" ? "active" : ""}`} onClick={() => setPage("home")}>Inicio</button>
-          <button className={`nav-btn ${page === "eval" ? "active" : ""}`} onClick={() => setPage("eval")}>Evaluación</button>
-          <button className={`nav-btn ${page === "port" ? "active" : ""}`} onClick={() => { setPage("port"); void loadDiagnostics(); }}>Portafolio</button>
-          <button className={`nav-btn ${page === "glos" ? "active" : ""}`} onClick={() => setPage("glos")}>Glosario</button>
-          <div className="nav-badge">prototipo</div>
-          <button className="nav-btn" onClick={handleLogout}>Salir</button>
+          <button className={`nav-btn ${page === "home" ? "active" : ""}`} onClick={() => setPage("home")}><span className="nav-ico">I</span><span className="nav-label">Inicio</span></button>
+          <button className={`nav-btn ${page === "eval" ? "active" : ""}`} onClick={() => setPage("eval")}><span className="nav-ico">E</span><span className="nav-label">Evaluación</span></button>
+          <button className={`nav-btn ${page === "port" ? "active" : ""}`} onClick={() => { setPage("port"); void loadDiagnostics(); }}><span className="nav-ico">P</span><span className="nav-label">Portafolio</span></button>
+          <button className={`nav-btn ${page === "glos" ? "active" : ""}`} onClick={() => setPage("glos")}><span className="nav-ico">G</span><span className="nav-label">Glosario</span></button>
+          <div className="nav-badge"><span className="nav-ico">β</span><span className="nav-label">prototipo</span></div>
+          <button className="nav-btn" onClick={handleLogout}><span className="nav-ico">S</span><span className="nav-label">Salir</span></button>
         </div>
       </nav>
 
