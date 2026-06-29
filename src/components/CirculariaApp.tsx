@@ -491,12 +491,15 @@ export default function CirculariaApp() {
   const [comments, setComments] = useState<DiagnosticComment[]>([]);
   const [commentDraft, setCommentDraft] = useState("");
   const [commentStatus, setCommentStatus] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const radarRef = useRef<HTMLCanvasElement | null>(null);
   const zoomRef = useRef<HTMLCanvasElement | null>(null);
   const rChartRef = useRef<Chart | null>(null);
   const zoomChartRef = useRef<Chart | null>(null);
 
   const pageClasses = (target: string) => (page === target ? "page active" : "page");
+
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const canDesign = currentUser?.role === "designer";
   const canReview = !!currentUser && currentUser.role !== "designer";
@@ -961,17 +964,20 @@ export default function CirculariaApp() {
 
   return (
     <div className="page-shell">
-      <nav className="nav">
+      <button className="mobile-menu-toggle" onClick={() => setMobileMenuOpen((open) => !open)}>
+        menu
+      </button>
+      <nav className={`nav ${mobileMenuOpen ? "mobile-open" : ""}`}>
         <div className="nav-handle" aria-hidden="true">menu</div>
-        <div className="logo" onClick={() => setPage("home")}>
+        <div className="logo" onClick={() => { setPage("home"); closeMobileMenu(); }}>
           <span className="logo-mark">c.</span>
           <span className="logo-word">circularia</span><em>.</em>
         </div>
         <div className="nav-links">
-          <button className={`nav-btn ${page === "home" ? "active" : ""}`} onClick={() => setPage("home")}><span className="nav-ico">I</span><span className="nav-label">Inicio</span></button>
-            {canDesign ? <button className={`nav-btn ${page === "eval" ? "active" : ""}`} onClick={() => setPage("eval")}><span className="nav-ico">E</span><span className="nav-label">Evaluación</span></button> : null}
-          <button className={`nav-btn ${page === "port" ? "active" : ""}`} onClick={() => { setPage("port"); void loadDiagnostics(); }}><span className="nav-ico">P</span><span className="nav-label">Portafolio</span></button>
-          <button className={`nav-btn ${page === "glos" ? "active" : ""}`} onClick={() => setPage("glos")}><span className="nav-ico">G</span><span className="nav-label">Glosario</span></button>
+            <button className={`nav-btn ${page === "home" ? "active" : ""}`} onClick={() => { setPage("home"); closeMobileMenu(); }}><span className="nav-ico">I</span><span className="nav-label">Inicio</span></button>
+            {canDesign ? <button className={`nav-btn ${page === "eval" ? "active" : ""}`} onClick={() => { setPage("eval"); closeMobileMenu(); }}><span className="nav-ico">E</span><span className="nav-label">Evaluación</span></button> : null}
+            <button className={`nav-btn ${page === "port" ? "active" : ""}`} onClick={() => { setPage("port"); void loadDiagnostics(); closeMobileMenu(); }}><span className="nav-ico">P</span><span className="nav-label">Portafolio</span></button>
+            <button className={`nav-btn ${page === "glos" ? "active" : ""}`} onClick={() => { setPage("glos"); closeMobileMenu(); }}><span className="nav-ico">G</span><span className="nav-label">Glosario</span></button>
           <div className="nav-badge"><span className="nav-ico">β</span><span className="nav-label">prototipo</span></div>
           <button className="nav-btn" onClick={handleLogout}><span className="nav-ico">S</span><span className="nav-label">Salir</span></button>
         </div>
