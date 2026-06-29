@@ -29,3 +29,27 @@ export async function ensureAuthSchema() {
     );
   `;
 }
+
+export async function ensureDiagnosticsSchema() {
+  await ensureAuthSchema();
+
+  const sql = getSql();
+  await sql`
+    create table if not exists diagnostics (
+      id uuid primary key default gen_random_uuid(),
+      user_id uuid not null references users(id) on delete cascade,
+      title text not null,
+      ficha jsonb not null,
+      answers jsonb not null,
+      stage_summary jsonb not null,
+      totals jsonb not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+  `;
+
+  await sql`
+    create index if not exists diagnostics_user_updated_idx
+    on diagnostics (user_id, updated_at desc);
+  `;
+}

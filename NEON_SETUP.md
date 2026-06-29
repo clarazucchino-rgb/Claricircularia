@@ -46,3 +46,16 @@ La app queda protegida por sesion. Al entrar a `/`, si no hay sesion activa, red
 ```
 
 Para salir, usar el boton `Salir` en la navegacion.
+
+## Diagnosticos guardados
+
+La app crea automaticamente una tabla `diagnostics` cuando el usuario guarda su primera evaluacion.
+
+Cada diagnostico queda asociado al usuario logueado e incluye:
+
+- ficha del proyecto
+- respuestas seleccionadas
+- resumen por etapa
+- totales ambiental, economico y social
+
+En la app, usar `Guardar diagnostico` desde la evaluacion. Luego entrar a `Portafolio` para ver los diagnosticos guardados en Neon.

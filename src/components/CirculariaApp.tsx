@@ -342,6 +342,35 @@ const STAGES = [
 
 type AnswersState = Record<string, Record<string, Record<number, Record<number, boolean>>>>;
 
+type FichaState = typeof defaultFichaState;
+
+type StageSummaryItem = {
+  soc: number;
+  eco: number;
+  env: number;
+  total: number;
+  lbl: string;
+  color: string;
+  num: string;
+};
+
+type Totals = {
+  soc: number;
+  eco: number;
+  env: number;
+};
+
+type Diagnostic = {
+  id: string;
+  title: string;
+  ficha: FichaState;
+  answers: AnswersState;
+  stageSummary: StageSummaryItem[];
+  totals: Totals;
+  createdAt: string;
+  updatedAt: string;
+};
+
 const initialAnswers: AnswersState = {};
 STAGES.forEach((stage) => {
   initialAnswers[stage.id] = {};
@@ -411,12 +440,26 @@ export default function CirculariaApp() {
   const [tagInput, setTagInput] = useState("");
   const [glosFilter, setGlosFilter] = useState("");
   const [glosCategory, setGlosCategory] = useState("todos");
+  const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
+  const [isLoadingDiagnostics, setIsLoadingDiagnostics] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
   const radarRef = useRef<HTMLCanvasElement | null>(null);
   const zoomRef = useRef<HTMLCanvasElement | null>(null);
   const rChartRef = useRef<Chart | null>(null);
   const zoomChartRef = useRef<Chart | null>(null);
 
   const pageClasses = (target: string) => (page === target ? "page active" : "page");
+
+  const loadDiagnostics = useCallback(async () => {
+    setIsLoadingDiagnostics(true);
+    const response = await fetch("/api/diagnostics");
+    const data = await response.json().catch(() => ({ diagnostics: [] }));
+    setIsLoadingDiagnostics(false);
+
+    if (response.ok) {
+      setDiagnostics(data.diagnostics ?? []);
+    }
+  }, []);
 
   const glosList = glosario.filter((item) => {
     const matchCat = glosCategory === "todos" || item.category === glosCategory;
@@ -443,6 +486,18 @@ export default function CirculariaApp() {
     );
     return { ...stageScore, total: stageScore.soc + stageScore.eco + stageScore.env, lbl: stage.lbl, color: stage.color, num: stage.num };
   }), [answers]);
+
+  const totals = useMemo(
+    () => stageSummary.reduce(
+      (acc, stage) => ({
+        soc: acc.soc + stage.soc,
+        eco: acc.eco + stage.eco,
+        env: acc.env + stage.env,
+      }),
+      { soc: 0, eco: 0, env: 0 }
+    ),
+    [stageSummary]
+  );
 
   useEffect(() => {
     if (!radarRef.current) return;
@@ -637,6 +692,50 @@ export default function CirculariaApp() {
     window.location.href = "/login";
   };
 
+  const handleSaveDiagnostic = async () => {
+    setSaveStatus("Guardando...");
+    const title = `${ficha.cat} · ${ficha.mer} · ${ficha.orig}`;
+    const response = await fetch("/api/diagnostics", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, ficha, answers, stageSummary, totals }),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setSaveStatus(data.error || "No se pudo guardar.");
+      return;
+    }
+
+    setDiagnostics((current) => [data.diagnostic, ...current]);
+    setSaveStatus("Diagnostico guardado.");
+    setTimeout(() => setSaveStatus(""), 2400);
+  };
+
+  const handleLoadDiagnostic = (diagnostic: Diagnostic) => {
+    setFicha(diagnostic.ficha);
+    setAnswers(diagnostic.answers);
+    setPage("eval");
+    setShowFicha(false);
+    setZoomStage(null);
+  };
+
+  const formatDiagnosticDate = (value: string) => {
+    return new Intl.DateTimeFormat("es", { month: "short", year: "numeric" }).format(new Date(value));
+  };
+
+  const scoreTone = (value: number) => {
+    if (value > 2) return { background: "#eef8e0", color: "#4a7a10" };
+    if (value < 0) return { background: "#fef3ea", color: "#c05a30" };
+    return { background: "#fef5e0", color: "#8a6a10" };
+  };
+
+  const statusForDiagnostic = (total: number) => {
+    if (total > 8) return { label: "Sólido", borderColor: "#a8e63d", color: "#5a8a20" };
+    if (total >= 0) return { label: "En revisión", borderColor: "#e8c23a", color: "#8a6a10" };
+    return { label: "Crítico", borderColor: "#e8734a", color: "#c05a30" };
+  };
+
   const renderStageTabs = () => {
     return (
       <>
@@ -715,7 +814,7 @@ export default function CirculariaApp() {
         <div className="nav-links">
           <button className={`nav-btn ${page === "home" ? "active" : ""}`} onClick={() => setPage("home")}>Inicio</button>
           <button className={`nav-btn ${page === "eval" ? "active" : ""}`} onClick={() => setPage("eval")}>Evaluación</button>
-          <button className={`nav-btn ${page === "port" ? "active" : ""}`} onClick={() => setPage("port")}>Portafolio</button>
+          <button className={`nav-btn ${page === "port" ? "active" : ""}`} onClick={() => { setPage("port"); void loadDiagnostics(); }}>Portafolio</button>
           <button className={`nav-btn ${page === "glos" ? "active" : ""}`} onClick={() => setPage("glos")}>Glosario</button>
           <div className="nav-badge">prototipo</div>
           <button className="nav-btn" onClick={handleLogout}>Salir</button>
@@ -859,6 +958,10 @@ export default function CirculariaApp() {
                 <div className="rk-info-row"><div className="rk-dot" style={{ background: "#e8734a" }}></div>Decisiones negativas lo expanden</div>
               </div>
             </div>
+            <div className="save-panel">
+              <button className="btn btn-p" onClick={handleSaveDiagnostic}>Guardar diagnostico</button>
+              {saveStatus ? <span className="save-status">{saveStatus}</span> : null}
+            </div>
           </div>
         </div>
       </div>
@@ -871,9 +974,37 @@ export default function CirculariaApp() {
             <p>Historial de evaluaciones realizadas. Cada tarjeta muestra el perfil de circularidad del producto y su estado de avance.</p>
           </div>
           <div className="port-grid" id="port-grid">
-            <div className="port-card"><div className="port-card-top"><span className="port-cat">Indumentaria · Femenino</span><div className="port-score"><div className="port-dot" style={{ background: "#a8e63d" }}></div><div className="port-dot" style={{ background: "#a8e63d" }}></div><div className="port-dot" style={{ background: "#e8c23a" }}></div><div className="port-dot" style={{ background: "#e8c23a" }}></div></div></div><div className="port-name">Colección Raíces</div><div className="port-prod">Chaqueta lana merino</div><div className="port-dims"><span className="port-dim" style={{ background: "#eef8e0", color: "#4a7a10" }}>Ambiental +6</span><span className="port-dim" style={{ background: "#eeeffe", color: "#4a4cca" }}>Económico +4</span><span className="port-dim" style={{ background: "#fef3ea", color: "#c05a30" }}>Social −2</span></div><div className="port-footer"><span className="port-date">Mar 2025 · Chile</span><span className="port-status" style={{ borderColor: "#a8e63d", color: "#5a8a20" }}>Completado</span></div></div>
-            <div className="port-card"><div className="port-card-top"><span className="port-cat">Calzado · Unisex</span><div className="port-score"><div className="port-dot" style={{ background: "#e8c23a" }}></div><div className="port-dot" style={{ background: "#e8c23a" }}></div><div className="port-dot" style={{ background: "#e8734a" }}></div></div></div><div className="port-name">Proyecto Pampa</div><div className="port-prod">Zapatilla cuero vegetal</div><div className="port-dims"><span className="port-dim" style={{ background: "#eef8e0", color: "#4a7a10" }}>Ambiental +2</span><span className="port-dim" style={{ background: "#fef5e0", color: "#8a6a10" }}>Económico 0</span><span className="port-dim" style={{ background: "#fef3ea", color: "#c05a30" }}>Social −3</span></div><div className="port-footer"><span className="port-date">Ene 2025 · Argentina</span><span className="port-status" style={{ borderColor: "#e8c23a", color: "#8a6a10" }}>En revisión</span></div></div>
-            <div className="port-card"><div className="port-card-top"><span className="port-cat">Accesorios · Unisex</span><div className="port-score"><div className="port-dot" style={{ background: "#a8e63d" }}></div><div className="port-dot" style={{ background: "#a8e63d" }}></div><div className="port-dot" style={{ background: "#a8e63d" }}></div></div></div><div className="port-name">Série Wayuu</div><div className="port-prod">Bolso tejido artesanal</div><div className="port-dims"><span className="port-dim" style={{ background: "#eef8e0", color: "#4a7a10" }}>Ambiental +8</span><span className="port-dim" style={{ background: "#eef8e0", color: "#4a7a10" }}>Económico +6</span><span className="port-dim" style={{ background: "#eef8e0", color: "#4a7a10" }}>Social +7</span></div><div className="port-footer"><span className="port-date">Feb 2025 · Colombia</span><span className="port-status" style={{ borderColor: "#a8e63d", color: "#5a8a20" }}>Completado</span></div></div>
+            {isLoadingDiagnostics ? (
+              <div className="port-empty"><p>Cargando diagnósticos guardados...</p></div>
+            ) : diagnostics.length ? diagnostics.map((diagnostic) => {
+              const total = diagnostic.totals.soc + diagnostic.totals.eco + diagnostic.totals.env;
+              const status = statusForDiagnostic(total);
+              return (
+                <div key={diagnostic.id} className="port-card" onClick={() => handleLoadDiagnostic(diagnostic)}>
+                  <div className="port-card-top">
+                    <span className="port-cat">{diagnostic.ficha.cat} · {diagnostic.ficha.mer}</span>
+                    <div className="port-score">
+                      {diagnostic.stageSummary.map((stage) => (
+                        <div key={stage.num} className="port-dot" style={{ background: stage.total >= 0 ? "#a8e63d" : "#e8734a" }}></div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="port-name">{diagnostic.title}</div>
+                  <div className="port-prod">{diagnostic.ficha.seg} · {diagnostic.ficha.esc}</div>
+                  <div className="port-dims">
+                    <span className="port-dim" style={scoreTone(diagnostic.totals.env)}>Ambiental {diagnostic.totals.env > 0 ? "+" : ""}{diagnostic.totals.env}</span>
+                    <span className="port-dim" style={scoreTone(diagnostic.totals.eco)}>Económico {diagnostic.totals.eco > 0 ? "+" : ""}{diagnostic.totals.eco}</span>
+                    <span className="port-dim" style={scoreTone(diagnostic.totals.soc)}>Social {diagnostic.totals.soc > 0 ? "+" : ""}{diagnostic.totals.soc}</span>
+                  </div>
+                  <div className="port-footer">
+                    <span className="port-date">{formatDiagnosticDate(diagnostic.updatedAt)} · {diagnostic.ficha.orig}</span>
+                    <span className="port-status" style={{ borderColor: status.borderColor, color: status.color }}>{status.label}</span>
+                  </div>
+                </div>
+              );
+            }) : (
+              <div className="port-empty"><p>Todavía no hay diagnósticos guardados. Comienza una evaluación y usa “Guardar diagnostico”.</p></div>
+            )}
           </div>
           <div className="port-add"><button className="btn btn-p" onClick={() => { setPage("eval"); setShowFicha(true); }} style={{ marginTop: 24 }}>+ Nueva evaluación</button></div>
         </div>
