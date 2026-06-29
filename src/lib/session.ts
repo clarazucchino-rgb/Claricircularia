@@ -10,7 +10,7 @@ export type SessionUser = {
   role: UserRole;
 };
 
-export type UserRole = "designer" | "finance" | "marketing" | "sustainability" | "operations";
+export type UserRole = "admin" | "designer" | "finance" | "marketing" | "sustainability" | "operations";
 
 type SessionPayload = {
   email: string;

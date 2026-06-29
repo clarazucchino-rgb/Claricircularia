@@ -27,7 +27,13 @@ export async function GET() {
 
   await ensureDiagnosticsSchema();
   const sql = getSql();
-  const rows = user.role === "designer"
+  const rows = user.role === "admin"
+    ? (await sql`
+    select id, title, project_code, status, ficha, answers, stage_summary, totals, created_at, updated_at
+    from diagnostics
+    order by updated_at desc;
+  `)
+    : user.role === "designer"
     ? (await sql`
     select id, title, project_code, status, ficha, answers, stage_summary, totals, created_at, updated_at
     from diagnostics
@@ -75,8 +81,8 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-  if (user.role !== "designer") {
-    return NextResponse.json({ error: "Solo diseño puede crear evaluaciones." }, { status: 403 });
+  if (user.role !== "designer" && user.role !== "admin") {
+    return NextResponse.json({ error: "Solo diseño o admin puede crear evaluaciones." }, { status: 403 });
   }
 
   const body = (await request.json().catch(() => ({}))) as DiagnosticPayload;

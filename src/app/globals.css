@@ -1301,6 +1301,79 @@ body {
   margin: 10px 0;
 }
 
+.team-wrap {
+  padding: 40px 48px;
+  max-width: 980px;
+  margin: 0 auto;
+  background: #fff;
+}
+
+.team-header {
+  margin-bottom: 28px;
+}
+
+.team-header h1 {
+  font-size: 24px;
+  font-weight: 300;
+  margin-bottom: 6px;
+}
+
+.team-header p,
+.team-status {
+  font-size: 12px;
+  font-weight: 300;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.team-create {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr 1fr 180px auto;
+  gap: 8px;
+  margin-bottom: 18px;
+  align-items: center;
+}
+
+.team-create input,
+.team-create select,
+.team-row input,
+.team-row select {
+  height: 36px;
+  border: 1px solid #c8c0b4;
+  border-radius: 2px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 11px;
+  background: #fff;
+  color: var(--text);
+  min-width: 0;
+}
+
+.team-list {
+  display: grid;
+  gap: 8px;
+}
+
+.team-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) 170px 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--border);
+  padding: 12px;
+}
+
+.team-name {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+
+.team-email {
+  font-size: 10px;
+  color: var(--muted);
+}
+
 .glos-wrap {
   padding: 40px 48px;
   max-width: 860px;
@@ -1452,6 +1525,17 @@ body {
 
 html, body, .page, .cp, .fp, .nav, .home-hero, .port-wrap, .glos-wrap {
   background-color: #ffffff !important;
+}
+
+@media (max-width: 820px) {
+  .team-wrap {
+    padding: 28px 18px;
+  }
+
+  .team-create,
+  .team-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 720px) {

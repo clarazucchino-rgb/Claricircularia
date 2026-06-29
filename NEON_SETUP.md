@@ -65,6 +65,7 @@ En la app, usar `Guardar diagnostico` desde la evaluacion. Luego entrar a `Porta
 Los usuarios tienen un `role`:
 
 - `designer`: crea proyectos/evaluaciones, cambia estados y resuelve comentarios.
+- `admin`: gestiona usuarios, ve todos los proyectos y puede operar el workflow.
 - `finance`: revisa proyectos en estado `En revision` y comenta.
 - `marketing`: revisa proyectos en estado `En revision` y comenta.
 - `sustainability`: revisa proyectos en estado `En revision` y comenta.
@@ -76,7 +77,13 @@ Estados de proyecto:
 - `En revision`: visible para perfiles revisores, que pueden comentar.
 - `Aprobada`: visible para revisión como proyecto ya aprobado.
 
-Para crear usuarios nuevos, ingresar con una cuenta `designer` y llamar:
+## Administracion de usuarios
+
+La app tiene una vista `Equipo` para listar usuarios, crear nuevos usuarios y cambiar roles. Si todavia no existe ningun `admin`, una cuenta `designer` puede entrar a `Equipo` y crear el primer usuario admin.
+
+Despues de que exista un admin, solo `admin` puede gestionar usuarios.
+
+Tambien se puede crear un usuario por API:
 
 ```bash
 curl -X POST https://TU-URL-DE-VERCEL/api/users \
@@ -90,4 +97,13 @@ curl -X POST https://TU-URL-DE-VERCEL/api/users \
   }'
 ```
 
-Tambien se puede hacer desde una herramienta como Postman o Insomnia usando la sesion activa del navegador. La pantalla de administracion de usuarios queda como siguiente mejora.
+Roles validos:
+
+```text
+admin
+designer
+finance
+marketing
+sustainability
+operations
+```

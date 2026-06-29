@@ -374,7 +374,7 @@ type Diagnostic = {
 };
 
 type ProjectStatus = "in_progress" | "in_review" | "approved";
-type UserRole = "designer" | "finance" | "marketing" | "sustainability" | "operations";
+type UserRole = "admin" | "designer" | "finance" | "marketing" | "sustainability" | "operations";
 
 type CurrentUser = {
   id: string;
@@ -392,6 +392,14 @@ type DiagnosticComment = {
   authorName: string | null;
   authorEmail: string;
   authorRole: UserRole;
+};
+
+type TeamUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: UserRole;
+  createdAt: string;
 };
 
 const initialAnswers: AnswersState = {};
@@ -432,6 +440,7 @@ const BASE = 5;
 const RANGE = 8;
 
 const roleLabels: Record<UserRole, string> = {
+  admin: "Admin",
   designer: "Diseño",
   finance: "Finanzas",
   marketing: "Marketing",
@@ -492,6 +501,9 @@ export default function CirculariaApp() {
   const [commentDraft, setCommentDraft] = useState("");
   const [commentStatus, setCommentStatus] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [teamUsers, setTeamUsers] = useState<TeamUser[]>([]);
+  const [teamStatus, setTeamStatus] = useState("");
+  const [newUser, setNewUser] = useState({ email: "", name: "", password: "", role: "designer" as UserRole });
   const radarRef = useRef<HTMLCanvasElement | null>(null);
   const zoomRef = useRef<HTMLCanvasElement | null>(null);
   const rChartRef = useRef<Chart | null>(null);
@@ -501,7 +513,8 @@ export default function CirculariaApp() {
 
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
-  const canDesign = currentUser?.role === "designer";
+  const canAdmin = currentUser?.role === "admin";
+  const canDesign = currentUser?.role === "designer" || currentUser?.role === "admin";
   const canReview = !!currentUser && currentUser.role !== "designer";
 
   const normalizeDiagnostic = useCallback((diagnostic: Diagnostic): Diagnostic => ({
@@ -539,6 +552,21 @@ export default function CirculariaApp() {
     if (response.ok) {
       setComments(data.comments ?? []);
     }
+  }, []);
+
+  const loadTeamUsers = useCallback(async () => {
+    setTeamStatus("Cargando equipo...");
+    const response = await fetch("/api/users");
+    const data = await response.json().catch(() => ({ users: [] }));
+
+    if (!response.ok) {
+      setTeamUsers([]);
+      setTeamStatus(data.error || "No se pudo cargar el equipo.");
+      return;
+    }
+
+    setTeamUsers(data.users ?? []);
+    setTeamStatus("");
   }, []);
 
   const glosList = glosario.filter((item) => {
@@ -875,6 +903,45 @@ export default function CirculariaApp() {
     setComments((current) => current.map((comment) => comment.id === commentId ? { ...comment, decision } : comment));
   };
 
+  const handleCreateUser = async () => {
+    setTeamStatus("Creando usuario...");
+    const response = await fetch("/api/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newUser),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setTeamStatus(data.error || "No se pudo crear el usuario.");
+      return;
+    }
+
+    setTeamUsers((current) => [data.user, ...current]);
+    setNewUser({ email: "", name: "", password: "", role: "designer" });
+    setTeamStatus("Usuario creado.");
+    setTimeout(() => setTeamStatus(""), 2200);
+  };
+
+  const handleUpdateUser = async (userId: string, changes: Partial<Pick<TeamUser, "name" | "role">> & { password?: string }) => {
+    setTeamStatus("Actualizando usuario...");
+    const response = await fetch(`/api/users/${userId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changes),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setTeamStatus(data.error || "No se pudo actualizar el usuario.");
+      return;
+    }
+
+    setTeamUsers((current) => current.map((user) => user.id === userId ? data.user : user));
+    setTeamStatus("Usuario actualizado.");
+    setTimeout(() => setTeamStatus(""), 2200);
+  };
+
   const formatDiagnosticDate = (value: string) => {
     return new Intl.DateTimeFormat("es", { month: "short", year: "numeric" }).format(new Date(value));
   };
@@ -978,6 +1045,7 @@ export default function CirculariaApp() {
             {canDesign ? <button className={`nav-btn ${page === "eval" ? "active" : ""}`} onClick={() => { setPage("eval"); closeMobileMenu(); }}><span className="nav-ico">E</span><span className="nav-label">Evaluación</span></button> : null}
             <button className={`nav-btn ${page === "port" ? "active" : ""}`} onClick={() => { setPage("port"); void loadDiagnostics(); closeMobileMenu(); }}><span className="nav-ico">P</span><span className="nav-label">Portafolio</span></button>
             <button className={`nav-btn ${page === "glos" ? "active" : ""}`} onClick={() => { setPage("glos"); closeMobileMenu(); }}><span className="nav-ico">G</span><span className="nav-label">Glosario</span></button>
+            {(canAdmin || currentUser?.role === "designer") ? <button className={`nav-btn ${page === "team" ? "active" : ""}`} onClick={() => { setPage("team"); void loadTeamUsers(); closeMobileMenu(); }}><span className="nav-ico">U</span><span className="nav-label">Equipo</span></button> : null}
           <div className="nav-badge"><span className="nav-ico">β</span><span className="nav-label">prototipo</span></div>
           <button className="nav-btn" onClick={handleLogout}><span className="nav-ico">S</span><span className="nav-label">Salir</span></button>
         </div>
@@ -1284,6 +1352,67 @@ export default function CirculariaApp() {
               </div>
             )) : (
               <div className="no-results">No se encontraron términos para esa búsqueda.</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className={pageClasses("team")} id="page-team">
+        <div className="team-wrap">
+          <div className="team-header">
+            <div className="slbl">Administración</div>
+            <h1>Equipo y usuarios</h1>
+            <p>Administra perfiles de acceso. Si todavía no existe un admin, diseño puede crear el primer usuario admin desde esta pantalla.</p>
+          </div>
+
+          <div className="team-create">
+            <input placeholder="Nombre" value={newUser.name} onChange={(event) => setNewUser((prev) => ({ ...prev, name: event.target.value }))} />
+            <input placeholder="Email" type="email" value={newUser.email} onChange={(event) => setNewUser((prev) => ({ ...prev, email: event.target.value }))} />
+            <input placeholder="Contraseña inicial" type="password" value={newUser.password} onChange={(event) => setNewUser((prev) => ({ ...prev, password: event.target.value }))} />
+            <select value={newUser.role} onChange={(event) => setNewUser((prev) => ({ ...prev, role: event.target.value as UserRole }))}>
+              {Object.entries(roleLabels).map(([role, label]) => (
+                <option key={role} value={role}>{label}</option>
+              ))}
+            </select>
+            <button className="btn btn-p" onClick={handleCreateUser}>Crear usuario</button>
+          </div>
+
+          {teamStatus ? <p className="team-status">{teamStatus}</p> : null}
+
+          <div className="team-list">
+            {teamUsers.length ? teamUsers.map((user) => (
+              <div key={user.id} className="team-row">
+                <div>
+                  <div className="team-name">{user.name || "Sin nombre"}</div>
+                  <div className="team-email">{user.email}</div>
+                </div>
+                <select value={user.role} onChange={(event) => handleUpdateUser(user.id, { role: event.target.value as UserRole })}>
+                  {Object.entries(roleLabels).map(([role, label]) => (
+                    <option key={role} value={role}>{label}</option>
+                  ))}
+                </select>
+                <input
+                  placeholder="Renombrar"
+                  defaultValue={user.name ?? ""}
+                  onBlur={(event) => {
+                    if (event.target.value !== (user.name ?? "")) {
+                      void handleUpdateUser(user.id, { name: event.target.value });
+                    }
+                  }}
+                />
+                <input
+                  placeholder="Nueva contraseña"
+                  type="password"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && event.currentTarget.value.length >= 8) {
+                      void handleUpdateUser(user.id, { password: event.currentTarget.value });
+                      event.currentTarget.value = "";
+                    }
+                  }}
+                />
+              </div>
+            )) : (
+              <div className="port-empty"><p>No hay usuarios para mostrar o no tenés permiso de administración.</p></div>
             )}
           </div>
         </div>

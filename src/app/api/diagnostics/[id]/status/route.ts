@@ -19,8 +19,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!user) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-  if (user.role !== "designer") {
-    return NextResponse.json({ error: "Solo diseño puede cambiar el estado." }, { status: 403 });
+  if (user.role !== "designer" && user.role !== "admin") {
+    return NextResponse.json({ error: "Solo diseño o admin puede cambiar el estado." }, { status: 403 });
   }
 
   const { id } = await params;
@@ -34,7 +34,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const rows = (await sql`
     update diagnostics
     set status = ${body.status}, updated_at = now()
-    where id = ${id} and user_id = ${user.id}
+    where id = ${id} and (${user.role} = 'admin' or user_id = ${user.id})
     returning id, status;
   `) as unknown as Array<{ id: string; status: Status }>;
 

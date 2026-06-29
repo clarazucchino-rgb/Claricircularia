@@ -5,7 +5,7 @@ import { SESSION_COOKIE, verifySession } from "@/lib/session";
 
 export const runtime = "nodejs";
 
-const reviewerRoles = ["finance", "marketing", "sustainability", "operations"];
+const reviewerRoles = ["admin", "finance", "marketing", "sustainability", "operations"];
 
 async function getCurrentUser() {
   const cookieStore = await cookies();
@@ -21,7 +21,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const { id } = await params;
   await ensureDiagnosticsSchema();
   const sql = getSql();
-  const access = user.role === "designer"
+  const access = user.role === "admin"
+    ? (await sql`select id from diagnostics where id = ${id};`)
+    : user.role === "designer"
     ? (await sql`select id from diagnostics where id = ${id} and user_id = ${user.id};`)
     : (await sql`select id from diagnostics where id = ${id} and status in ('in_review', 'approved');`);
 

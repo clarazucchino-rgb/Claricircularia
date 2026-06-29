@@ -9,7 +9,7 @@ type SetupBody = {
   email?: string;
   password?: string;
   name?: string;
-  role?: "designer" | "finance" | "marketing" | "sustainability" | "operations";
+  role?: "admin" | "designer" | "finance" | "marketing" | "sustainability" | "operations";
 };
 
 export async function POST(request: Request) {

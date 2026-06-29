@@ -21,8 +21,8 @@ export async function PATCH(
   if (!user) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-  if (user.role !== "designer") {
-    return NextResponse.json({ error: "Solo diseño puede resolver comentarios." }, { status: 403 });
+  if (user.role !== "designer" && user.role !== "admin") {
+    return NextResponse.json({ error: "Solo diseño o admin puede resolver comentarios." }, { status: 403 });
   }
 
   const { id, commentId } = await params;
@@ -40,7 +40,7 @@ export async function PATCH(
     where c.id = ${commentId}
       and c.diagnostic_id = d.id
       and d.id = ${id}
-      and d.user_id = ${user.id}
+      and (${user.role} = 'admin' or d.user_id = ${user.id})
     returning c.id, c.decision;
   `) as unknown as Array<{ id: string; decision: Decision }>;
 
