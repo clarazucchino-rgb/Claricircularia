@@ -22,11 +22,11 @@ export async function POST(request: Request) {
   await ensureAuthSchema();
   const sql = getSql();
   const users = (await sql`
-    select id, email, name, password_hash
+    select id, email, name, role, password_hash
     from users
     where lower(email) = ${email}
     limit 1;
-  `) as unknown as Array<{ id: string; email: string; name: string | null; password_hash: string }>;
+  `) as unknown as Array<{ id: string; email: string; name: string | null; role: "designer" | "finance" | "marketing" | "sustainability" | "operations"; password_hash: string }>;
 
   const user = users[0];
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Email o contraseña incorrectos." }, { status: 401 });
   }
 
-  const token = await signSession({ id: user.id, email: user.email, name: user.name });
+  const token = await signSession({ id: user.id, email: user.email, name: user.name, role: user.role });
   const response = NextResponse.json({ ok: true });
   response.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,

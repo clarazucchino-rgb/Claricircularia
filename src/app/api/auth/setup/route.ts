@@ -9,6 +9,7 @@ type SetupBody = {
   email?: string;
   password?: string;
   name?: string;
+  role?: "designer" | "finance" | "marketing" | "sustainability" | "operations";
 };
 
 export async function POST(request: Request) {
@@ -25,6 +26,7 @@ export async function POST(request: Request) {
   const email = body.email?.trim().toLowerCase();
   const password = body.password ?? "";
   const name = body.name?.trim() || null;
+  const role = body.role ?? "designer";
 
   if (!email || password.length < 8) {
     return NextResponse.json({ error: "Usa un email y una contraseña de al menos 8 caracteres." }, { status: 400 });
@@ -39,8 +41,8 @@ export async function POST(request: Request) {
 
   const passwordHash = await bcrypt.hash(password, 12);
   await sql`
-    insert into users (email, name, password_hash)
-    values (${email}, ${name}, ${passwordHash});
+    insert into users (email, name, role, password_hash)
+    values (${email}, ${name}, ${role}, ${passwordHash});
   `;
 
   return NextResponse.json({ ok: true });

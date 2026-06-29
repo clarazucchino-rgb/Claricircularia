@@ -363,12 +363,35 @@ type Totals = {
 type Diagnostic = {
   id: string;
   title: string;
+  projectCode: string;
+  status: ProjectStatus;
   ficha: FichaState;
   answers: AnswersState;
   stageSummary: StageSummaryItem[];
   totals: Totals;
   createdAt: string;
   updatedAt: string;
+};
+
+type ProjectStatus = "in_progress" | "in_review" | "approved";
+type UserRole = "designer" | "finance" | "marketing" | "sustainability" | "operations";
+
+type CurrentUser = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: UserRole;
+};
+
+type DiagnosticComment = {
+  id: string;
+  area: UserRole;
+  body: string;
+  decision: "open" | "accepted" | "dismissed";
+  createdAt: string;
+  authorName: string | null;
+  authorEmail: string;
+  authorRole: UserRole;
 };
 
 const initialAnswers: AnswersState = {};
@@ -389,7 +412,13 @@ const initialPreloaded: AnswersState = {
   postconsumo: { A: { 0: { 0: true, 1: true, 3: true } } },
 };
 
+function createProjectCode() {
+  return `CIR-${new Date().getFullYear()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+}
+
 const defaultFichaState = {
+  projectName: "",
+  projectCode: createProjectCode(),
   cat: "Indumentaria",
   mer: "Femenino",
   seg: "Intermedio",
@@ -401,6 +430,20 @@ const defaultFichaState = {
 
 const BASE = 5;
 const RANGE = 8;
+
+const roleLabels: Record<UserRole, string> = {
+  designer: "Diseño",
+  finance: "Finanzas",
+  marketing: "Marketing",
+  sustainability: "Sostenibilidad",
+  operations: "Operaciones",
+};
+
+const statusLabels: Record<ProjectStatus, string> = {
+  in_progress: "En progreso",
+  in_review: "En revisión",
+  approved: "Aprobada",
+};
 
 const glosario = [
   {
@@ -443,12 +486,38 @@ export default function CirculariaApp() {
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [isLoadingDiagnostics, setIsLoadingDiagnostics] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [selectedDiagnostic, setSelectedDiagnostic] = useState<Diagnostic | null>(null);
+  const [comments, setComments] = useState<DiagnosticComment[]>([]);
+  const [commentDraft, setCommentDraft] = useState("");
+  const [commentStatus, setCommentStatus] = useState("");
   const radarRef = useRef<HTMLCanvasElement | null>(null);
   const zoomRef = useRef<HTMLCanvasElement | null>(null);
   const rChartRef = useRef<Chart | null>(null);
   const zoomChartRef = useRef<Chart | null>(null);
 
   const pageClasses = (target: string) => (page === target ? "page active" : "page");
+
+  const canDesign = currentUser?.role === "designer";
+  const canReview = !!currentUser && currentUser.role !== "designer";
+
+  const normalizeDiagnostic = useCallback((diagnostic: Diagnostic): Diagnostic => ({
+    ...diagnostic,
+    ficha: {
+      ...defaultFichaState,
+      ...diagnostic.ficha,
+      projectName: diagnostic.ficha.projectName || diagnostic.title,
+      projectCode: diagnostic.ficha.projectCode || diagnostic.projectCode,
+      tags: diagnostic.ficha.tags ?? [],
+    },
+  }), []);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((response) => response.json())
+      .then((data) => setCurrentUser(data.user ?? null))
+      .catch(() => setCurrentUser(null));
+  }, []);
 
   const loadDiagnostics = useCallback(async () => {
     setIsLoadingDiagnostics(true);
@@ -457,7 +526,15 @@ export default function CirculariaApp() {
     setIsLoadingDiagnostics(false);
 
     if (response.ok) {
-      setDiagnostics(data.diagnostics ?? []);
+      setDiagnostics((data.diagnostics ?? []).map(normalizeDiagnostic));
+    }
+  }, [normalizeDiagnostic]);
+
+  const loadComments = useCallback(async (diagnosticId: string) => {
+    const response = await fetch(`/api/diagnostics/${diagnosticId}/comments`);
+    const data = await response.json().catch(() => ({ comments: [] }));
+    if (response.ok) {
+      setComments(data.comments ?? []);
     }
   }, []);
 
@@ -693,12 +770,16 @@ export default function CirculariaApp() {
   };
 
   const handleSaveDiagnostic = async () => {
+    if (!canDesign) {
+      setSaveStatus("Solo diseño puede guardar proyectos.");
+      return;
+    }
     setSaveStatus("Guardando...");
-    const title = `${ficha.cat} · ${ficha.mer} · ${ficha.orig}`;
+    const title = ficha.projectName.trim() || `${ficha.cat} · ${ficha.mer} · ${ficha.orig}`;
     const response = await fetch("/api/diagnostics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, ficha, answers, stageSummary, totals }),
+      body: JSON.stringify({ title, projectCode: ficha.projectCode, ficha, answers, stageSummary, totals }),
     });
     const data = await response.json().catch(() => ({}));
 
@@ -707,17 +788,88 @@ export default function CirculariaApp() {
       return;
     }
 
-    setDiagnostics((current) => [data.diagnostic, ...current]);
+    const diagnostic = normalizeDiagnostic(data.diagnostic);
+    setDiagnostics((current) => [diagnostic, ...current]);
+    setSelectedDiagnostic(diagnostic);
     setSaveStatus("Diagnostico guardado.");
     setTimeout(() => setSaveStatus(""), 2400);
   };
 
   const handleLoadDiagnostic = (diagnostic: Diagnostic) => {
+    setSelectedDiagnostic(diagnostic);
+    void loadComments(diagnostic.id);
+  };
+
+  const handleOpenDiagnostic = (diagnostic: Diagnostic) => {
     setFicha(diagnostic.ficha);
     setAnswers(diagnostic.answers);
+    setSelectedDiagnostic(diagnostic);
     setPage("eval");
     setShowFicha(false);
     setZoomStage(null);
+    void loadComments(diagnostic.id);
+  };
+
+  const handleNewDiagnostic = () => {
+    setFicha({ ...defaultFichaState, projectCode: createProjectCode(), tags: [...defaultFichaState.tags] });
+    setAnswers(structuredClone({ ...initialAnswers, ...initialPreloaded }));
+    setSelectedDiagnostic(null);
+    setComments([]);
+    setSaveStatus("");
+    setPage("eval");
+    setShowFicha(true);
+  };
+
+  const handleStatusChange = async (diagnostic: Diagnostic, status: ProjectStatus) => {
+    const response = await fetch(`/api/diagnostics/${diagnostic.id}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setCommentStatus(data.error || "No se pudo cambiar el estado.");
+      return;
+    }
+
+    setDiagnostics((current) => current.map((item) => item.id === diagnostic.id ? { ...item, status } : item));
+    setSelectedDiagnostic((current) => current?.id === diagnostic.id ? { ...current, status } : current);
+  };
+
+  const handleAddComment = async () => {
+    if (!selectedDiagnostic) return;
+    setCommentStatus("Guardando comentario...");
+    const response = await fetch(`/api/diagnostics/${selectedDiagnostic.id}/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body: commentDraft }),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setCommentStatus(data.error || "No se pudo comentar.");
+      return;
+    }
+
+    setComments((current) => [data.comment, ...current]);
+    setCommentDraft("");
+    setCommentStatus("");
+  };
+
+  const handleCommentDecision = async (commentId: string, decision: "accepted" | "dismissed") => {
+    if (!selectedDiagnostic) return;
+    const response = await fetch(`/api/diagnostics/${selectedDiagnostic.id}/comments/${commentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setCommentStatus(data.error || "No se pudo resolver el comentario.");
+      return;
+    }
+
+    setComments((current) => current.map((comment) => comment.id === commentId ? { ...comment, decision } : comment));
   };
 
   const formatDiagnosticDate = (value: string) => {
@@ -730,10 +882,10 @@ export default function CirculariaApp() {
     return { background: "#fef5e0", color: "#8a6a10" };
   };
 
-  const statusForDiagnostic = (total: number) => {
-    if (total > 8) return { label: "Sólido", borderColor: "#a8e63d", color: "#5a8a20" };
-    if (total >= 0) return { label: "En revisión", borderColor: "#e8c23a", color: "#8a6a10" };
-    return { label: "Crítico", borderColor: "#e8734a", color: "#c05a30" };
+  const statusForDiagnostic = (status: ProjectStatus) => {
+    if (status === "approved") return { label: statusLabels[status], borderColor: "#a8e63d", color: "#5a8a20" };
+    if (status === "in_review") return { label: statusLabels[status], borderColor: "#e8c23a", color: "#8a6a10" };
+    return { label: statusLabels[status], borderColor: "#c8c0b4", color: "#6a6458" };
   };
 
   const renderStageTabs = () => {
@@ -817,7 +969,7 @@ export default function CirculariaApp() {
         </div>
         <div className="nav-links">
           <button className={`nav-btn ${page === "home" ? "active" : ""}`} onClick={() => setPage("home")}><span className="nav-ico">I</span><span className="nav-label">Inicio</span></button>
-          <button className={`nav-btn ${page === "eval" ? "active" : ""}`} onClick={() => setPage("eval")}><span className="nav-ico">E</span><span className="nav-label">Evaluación</span></button>
+            {canDesign ? <button className={`nav-btn ${page === "eval" ? "active" : ""}`} onClick={() => setPage("eval")}><span className="nav-ico">E</span><span className="nav-label">Evaluación</span></button> : null}
           <button className={`nav-btn ${page === "port" ? "active" : ""}`} onClick={() => { setPage("port"); void loadDiagnostics(); }}><span className="nav-ico">P</span><span className="nav-label">Portafolio</span></button>
           <button className={`nav-btn ${page === "glos" ? "active" : ""}`} onClick={() => setPage("glos")}><span className="nav-ico">G</span><span className="nav-label">Glosario</span></button>
           <div className="nav-badge"><span className="nav-ico">β</span><span className="nav-label">prototipo</span></div>
@@ -856,7 +1008,7 @@ export default function CirculariaApp() {
             </div>
           </div>
           <div className="home-cta">
-            <button className="cta-btn" onClick={() => { setPage("eval"); setShowFicha(true); }}>Iniciar evaluación →</button>
+            {canDesign ? <button className="cta-btn" onClick={handleNewDiagnostic}>Iniciar evaluación →</button> : <button className="cta-btn" onClick={() => { setPage("port"); void loadDiagnostics(); }}>Revisar proyectos →</button>}
             <p className="home-legal">Prototipo funcional · Diseñado para la industria de la moda y diseño latinoamericano · Evaluación cualitativa</p>
           </div>
         </div>
@@ -870,6 +1022,19 @@ export default function CirculariaApp() {
                 <div className="slbl">Nuevo proyecto</div>
                 <div className="stitle">Ficha de proyecto</div>
                 <div className="sdesc">Categoriza el producto antes de iniciar la evaluación. El mapa de impacto se activa al comenzar.</div>
+                <div className="field">
+                  <label>Nombre del proyecto</label>
+                  <input
+                    className="project-input"
+                    value={ficha.projectName}
+                    onChange={(event) => setFicha((prev) => ({ ...prev, projectName: event.target.value }))}
+                    placeholder="Ej. Colección cápsula otoño"
+                  />
+                </div>
+                <div className="field">
+                  <label>Código automático</label>
+                  <div className="project-code">{ficha.projectCode}</div>
+                </div>
                 <div className="field"><label>Categoría del producto</label><div className="chips">{["Indumentaria", "Calzado", "Complementos", "Joyería", "Accesorios"].map((option) => (
                   <div key={option} className={`chip ${ficha.cat === option ? "sel" : ""}`} onClick={() => setFicha((prev) => ({ ...prev, cat: option }))}>{option}</div>
                 ))}</div></div>
@@ -927,7 +1092,7 @@ export default function CirculariaApp() {
           </div>
           <div className="cp" id="cp">
             <div className="cm-name" style={{ color: "#1a1f2e" }}>{`${ficha.cat} · ${ficha.mer}`}</div>
-            <div className="cm-sub" style={{ color: "#6a6458" }}>Mapa de impacto — tiempo real</div>
+            <div className="cm-sub" style={{ color: "#6a6458" }}>{ficha.projectName || "Proyecto sin nombre"} · {ficha.projectCode}</div>
             <div className="stage-tabs" id="stage-tabs">{renderStageTabs()}</div>
             <div className="radar-wrap" id="radar-view" style={{ display: zoomStage ? "none" : "flex" }}>
               <canvas id="rc" ref={radarRef} width={280} height={280} />
@@ -963,7 +1128,7 @@ export default function CirculariaApp() {
               </div>
             </div>
             <div className="save-panel">
-              <button className="btn btn-p" onClick={handleSaveDiagnostic}>Guardar diagnostico</button>
+              {canDesign ? <button className="btn btn-p" onClick={handleSaveDiagnostic}>Guardar diagnostico</button> : null}
               {saveStatus ? <span className="save-status">{saveStatus}</span> : null}
             </div>
           </div>
@@ -981,8 +1146,7 @@ export default function CirculariaApp() {
             {isLoadingDiagnostics ? (
               <div className="port-empty"><p>Cargando diagnósticos guardados...</p></div>
             ) : diagnostics.length ? diagnostics.map((diagnostic) => {
-              const total = diagnostic.totals.soc + diagnostic.totals.eco + diagnostic.totals.env;
-              const status = statusForDiagnostic(total);
+              const status = statusForDiagnostic(diagnostic.status);
               return (
                 <div key={diagnostic.id} className="port-card" onClick={() => handleLoadDiagnostic(diagnostic)}>
                   <div className="port-card-top">
@@ -994,7 +1158,7 @@ export default function CirculariaApp() {
                     </div>
                   </div>
                   <div className="port-name">{diagnostic.title}</div>
-                  <div className="port-prod">{diagnostic.ficha.seg} · {diagnostic.ficha.esc}</div>
+                  <div className="port-prod">{diagnostic.projectCode} · {diagnostic.ficha.seg} · {diagnostic.ficha.esc}</div>
                   <div className="port-dims">
                     <span className="port-dim" style={scoreTone(diagnostic.totals.env)}>Ambiental {diagnostic.totals.env > 0 ? "+" : ""}{diagnostic.totals.env}</span>
                     <span className="port-dim" style={scoreTone(diagnostic.totals.eco)}>Económico {diagnostic.totals.eco > 0 ? "+" : ""}{diagnostic.totals.eco}</span>
@@ -1010,7 +1174,61 @@ export default function CirculariaApp() {
               <div className="port-empty"><p>Todavía no hay diagnósticos guardados. Comienza una evaluación y usa “Guardar diagnostico”.</p></div>
             )}
           </div>
-          <div className="port-add"><button className="btn btn-p" onClick={() => { setPage("eval"); setShowFicha(true); }} style={{ marginTop: 24 }}>+ Nueva evaluación</button></div>
+          {selectedDiagnostic ? (
+            <div className="review-panel">
+              <div className="review-head">
+                <div>
+                  <div className="slbl">Workflow</div>
+                  <h2>{selectedDiagnostic.title}</h2>
+                  <p>{selectedDiagnostic.projectCode} · {statusLabels[selectedDiagnostic.status]}</p>
+                </div>
+                <div className="status-actions">
+                  <button className="btn" onClick={() => handleOpenDiagnostic(selectedDiagnostic)}>Abrir evaluación</button>
+                  {canDesign ? (
+                    <>
+                    <button className={`btn ${selectedDiagnostic.status === "in_progress" ? "btn-p" : ""}`} onClick={() => handleStatusChange(selectedDiagnostic, "in_progress")}>En progreso</button>
+                    <button className={`btn ${selectedDiagnostic.status === "in_review" ? "btn-p" : ""}`} onClick={() => handleStatusChange(selectedDiagnostic, "in_review")}>En revisión</button>
+                    <button className={`btn ${selectedDiagnostic.status === "approved" ? "btn-p" : ""}`} onClick={() => handleStatusChange(selectedDiagnostic, "approved")}>Aprobada</button>
+                    </>
+                  ) : null}
+                </div>
+              </div>
+
+              {canReview && selectedDiagnostic.status === "in_review" ? (
+                <div className="comment-form">
+                  <label>Comentario de {currentUser ? roleLabels[currentUser.role] : "revisión"}</label>
+                  <textarea value={commentDraft} onChange={(event) => setCommentDraft(event.target.value)} placeholder="Observación, riesgo, ajuste o recomendación..." />
+                  <button className="btn btn-p" onClick={handleAddComment}>Agregar comentario</button>
+                </div>
+              ) : null}
+
+              {commentStatus ? <p className="comment-status">{commentStatus}</p> : null}
+
+              <div className="comment-list">
+                {comments.length ? comments.map((comment) => (
+                  <div key={comment.id} className={`comment-card ${comment.decision}`}>
+                    <div className="comment-meta">
+                      <strong>{roleLabels[comment.area]}</strong>
+                      <span>{comment.authorName || comment.authorEmail}</span>
+                    </div>
+                    <p>{comment.body}</p>
+                    <div className="comment-footer">
+                      <span>{comment.decision === "open" ? "Pendiente" : comment.decision === "accepted" ? "Tomado en cuenta" : "Descartado"}</span>
+                      {canDesign && comment.decision === "open" ? (
+                        <div className="comment-actions">
+                          <button className="btn" onClick={() => handleCommentDecision(comment.id, "accepted")}>Tomar en cuenta</button>
+                          <button className="btn" onClick={() => handleCommentDecision(comment.id, "dismissed")}>Descartar</button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )) : (
+                  <div className="port-empty"><p>Sin comentarios todavía.</p></div>
+                )}
+              </div>
+            </div>
+          ) : null}
+          <div className="port-add">{canDesign ? <button className="btn btn-p" onClick={handleNewDiagnostic} style={{ marginTop: 24 }}>+ Nueva evaluación</button> : null}</div>
         </div>
       </div>
 

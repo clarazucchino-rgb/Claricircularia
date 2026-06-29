@@ -541,6 +541,35 @@ body {
   margin-bottom: 8px;
 }
 
+.project-input {
+  width: 100%;
+  height: 38px;
+  border: 1px solid #c8c0b4;
+  border-radius: 2px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: #fff;
+}
+
+.project-input:focus {
+  outline: 2px solid rgba(126, 200, 50, .35);
+  border-color: var(--envd);
+}
+
+.project-code {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 6px 10px;
+  border: 1px solid var(--envd);
+  color: #5a8a20;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -1158,6 +1187,114 @@ body {
 .port-add {
   margin-top: 24px;
   text-align: center;
+}
+
+.review-panel {
+  margin-top: 28px;
+  border: 1px solid #1a1f2e;
+  padding: 22px;
+  background: #fff;
+}
+
+.review-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.review-head h2 {
+  font-size: 18px;
+  font-weight: 400;
+  margin: 4px 0;
+}
+
+.review-head p,
+.comment-status {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.status-actions,
+.comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: flex-end;
+}
+
+.comment-form {
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.comment-form label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.comment-form textarea {
+  min-height: 92px;
+  resize: vertical;
+  border: 1px solid #c8c0b4;
+  border-radius: 2px;
+  padding: 12px;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text);
+  background: #fff;
+}
+
+.comment-list {
+  display: grid;
+  gap: 10px;
+}
+
+.comment-card {
+  border: 1px solid var(--border);
+  padding: 14px;
+  border-left: 3px solid #e8c23a;
+}
+
+.comment-card.accepted {
+  border-left-color: var(--envd);
+}
+
+.comment-card.dismissed {
+  border-left-color: #e8734a;
+}
+
+.comment-meta,
+.comment-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.comment-meta strong {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+
+.comment-meta span,
+.comment-footer span {
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.comment-card p {
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 10px 0;
 }
 
 .glos-wrap {

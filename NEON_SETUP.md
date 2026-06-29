@@ -59,3 +59,35 @@ Cada diagnostico queda asociado al usuario logueado e incluye:
 - totales ambiental, economico y social
 
 En la app, usar `Guardar diagnostico` desde la evaluacion. Luego entrar a `Portafolio` para ver los diagnosticos guardados en Neon.
+
+## Roles y revision
+
+Los usuarios tienen un `role`:
+
+- `designer`: crea proyectos/evaluaciones, cambia estados y resuelve comentarios.
+- `finance`: revisa proyectos en estado `En revision` y comenta.
+- `marketing`: revisa proyectos en estado `En revision` y comenta.
+- `sustainability`: revisa proyectos en estado `En revision` y comenta.
+- `operations`: revisa proyectos en estado `En revision` y comenta.
+
+Estados de proyecto:
+
+- `En progreso`: visible solo para diseño.
+- `En revision`: visible para perfiles revisores, que pueden comentar.
+- `Aprobada`: visible para revisión como proyecto ya aprobado.
+
+Para crear usuarios nuevos, ingresar con una cuenta `designer` y llamar:
+
+```bash
+curl -X POST https://TU-URL-DE-VERCEL/api/users \
+  -H "Content-Type: application/json" \
+  -b "circularia_session=COOKIE_DE_SESION" \
+  -d '{
+    "email": "finanzas@empresa.com",
+    "password": "contraseña-segura",
+    "name": "Finanzas",
+    "role": "finance"
+  }'
+```
+
+Tambien se puede hacer desde una herramienta como Postman o Insomnia usando la sesion activa del navegador. La pantalla de administracion de usuarios queda como siguiente mejora.

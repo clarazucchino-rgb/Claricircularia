@@ -7,11 +7,15 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string | null;
+  role: UserRole;
 };
+
+export type UserRole = "designer" | "finance" | "marketing" | "sustainability" | "operations";
 
 type SessionPayload = {
   email: string;
   name: string | null;
+  role: UserRole;
 };
 
 function getSessionKey() {
@@ -26,7 +30,7 @@ export async function signSession(user: SessionUser) {
     throw new Error("Missing SESSION_SECRET environment variable.");
   }
 
-  return new SignJWT({ email: user.email, name: user.name } satisfies SessionPayload)
+  return new SignJWT({ email: user.email, name: user.name, role: user.role } satisfies SessionPayload)
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
@@ -48,6 +52,7 @@ export async function verifySession(token?: string | null): Promise<SessionUser 
       id: payload.sub,
       email: payload.email,
       name: payload.name ?? null,
+      role: payload.role ?? "designer",
     };
   } catch {
     return null;
